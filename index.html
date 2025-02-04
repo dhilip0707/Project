@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Mapbox Vertipad - Trapezoid</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            z-index: 1;
+            width: 250px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .control-group {
+            margin: 10px 0;
+        }
+
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        label {
+            font-family: Arial, sans-serif;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .value-display {
+            color: #666;
+        }
+
+        input[type="range"] {
+            width: 100%;
+        }
+
+        button {
+            margin: 5px;
+            padding: 5px 10px;
+        }
+
+        input[type="color"] {
+            width: 50px;
+            height: 25px;
+            padding: 0;
+            border: none;
+        }
+
+        .shape-selector {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 15px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <div id="controls">
+        <div class="shape-selector">
+            <div class="radio-group">
+                <div class="radio-option">
+                    <input type="radio" id="straight" name="shapeType" value="straight" checked>
+                    <label for="straight">Straight Trapezoid</label>
+                </div>
+                <div class="radio-option">
+                    <input type="radio" id="curved" name="shapeType" value="curved">
+                    <label for="curved">Curved Trapezoid</label>
+                </div>
+            </div>
+        </div>
+        <div class="control-group">
+            <button onclick="addVertipad()">Add Vertipad</button>
+            <button onclick="removeVertipad()">Remove Vertipad</button>
+            <button onclick="toggleDimensions()">Toggle Dimensions</button>
+        </div>
+        <div class="control-group">
+            <div class="slider-container">
+                <label>Edge Length: <span id="edgeLengthValue">15</span>m</label>
+                <input type="range" id="edgeLengthSlider" min="1" max="2000" value="15" oninput="updateDimensions()">
+
+                <label>Start Edge Height: <span id="baseHeightValue">0</span>m</label>
+                <input type="range" id="baseHeightSlider" min="0" max="1000" value="0" oninput="updateDimensions()">
+
+                <label>Middle Edge Length: <span id="middleEdgeLengthValue">50</span>m</label>
+                <input type="range" id="middleEdgeLengthSlider" min="1" max="2000" value="50" oninput="updateDimensions()">
+
+                <label>Middle Edge Distance:<span id="middleEdgeDistanceValue">500</span>m</label>
+                <input type="range" id="middleEdgeDistanceSlider" min="1" max="2000" value="500" oninput="updateDimensions()">
+            
+                <label>End Edge Length: <span id="parallelEdgeValue">100</span>m</label>
+                <input type="range" id="parallelEdgeSlider" min="1" max="2000" value="100" oninput="updateDimensions()">
+
+                <label>End Edge Height: <span id="heightValue">152</span>m</label>
+                <input type="range" id="heightSlider" min="0" max="1000" value="152" oninput="updateDimensions()">
+
+                <label>Path Length: <span id="depthValue">1219</span>m</label>
+                <input type="range" id="depthSlider" min="0" max="2000" value="1219" oninput="updateDimensions()">
+
+                <label>Transitional Surface Height: <span id="transitionalHeightValue">50</span>m</label>
+                <input type="range" id="transitionalHeightSlider" min="1" max="200" value="30" oninput="updateDimensions()">
+
+                <label>Transitional Surface Rotation:<span id="transitionalRotationValue">0</span>&deg</label>
+                <input type="range" id="transitionalRotationSlider" min="1" max="360" value="0" oninput="updateDimensions()">
+                <label >Surface Color: <input type="color" id="surface" value="#3cb371" oninput="updateDimensions()"></label>
+                <div id="curveDirectionControl" style="display: none;">
+                    <label>Curve Direction:</label>
+                    <div class="radio-group">
+                        <div class="radio-option">
+                            <input type="radio" id="curveLeft" name="curveDirection" value="left" checked>
+                            <label for="curveLeft">Curve Left</label>
+                        </div>
+                        <div class="radio-option">
+                            <input type="radio" id="curveRight" name="curveDirection" value="right">
+                            <label for="curveRight">Curve Right</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="radiusControl" style="display: none;">
+                    <label>Curve Radius: <span id="radiusValue">500</span>m</label>
+                    <input type="range" id="radiusSlider" min="100" max="2000" value="500" oninput="updateDimensions()">
+
+                    <label>Start edge Rotation: <span id="startEdgeRotationValue">0</span>°</label>
+                    <input type="range" id="startEdgeRotationSlider" min="0" max="359" value="0"
+                        oninput="updateDimensions()">
+
+                    <label> End edge Rotation: <span id="endEdgeRotationValue">0</span>°</label>
+                    <input type="range" id="endEdgeRotationSlider" min="0" max="359" value="0"
+                        oninput="updateDimensions()">
+
+
+                </div>
+
+                <label>Rotation: <span id="rotationValue">0</span>°</label>
+                <input type="range" id="rotationSlider" min="0" max="359" value="0" oninput="updateDimensions()">
+
+                <label>Trapezoid Color: <input type="color" id="colorPicker" value="#0953E1" oninput="updateDimensions()"></label>
+
+                <label>Transparency: <span id="transparencyValue">50</span>%</label>
+                <input type="range" id="transparencySlider" min="0" max="100" value="50" oninput="updateDimensions()">
+            </div>
+        </div>
+        <div id="coordinates" style="font-size: 12px;"></div>
+    </div>
+
+    <script>
+        //map
+        mapboxgl.accessToken = 'pk.eyJ1IjoiYnViYmx6IiwiYSI6ImNsdWJjNTZsOTA0dngybXBrMTg3dG9zcG4ifQ.Yy8jAovObNtaFr7J7ewVHw';
+
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v11',
+            center: [-74.0237, 40.7128],
+            zoom: 22, 
+            pitch: 45,
+            bearing: 0
+        }); 
+
+        let customLayer;
+        let currentPosition = [-74.0237, 40.7128];
+        let showDimensions = false;
+
+
+
+
+        // Add this to the radio button event listeners(curved shape):
+        document.addEventListener('DOMContentLoaded', function () {
+            const radiusControl = document.getElementById('radiusControl');
+            const curveDirectionControl = document.getElementById('curveDirectionControl');
+
+            document.querySelectorAll('input[name="shapeType"]').forEach(radio => {
+                radio.addEventListener('change', function () {
+                    radiusControl.style.display = this.value === 'curved' ? 'block' : 'none';
+                    curveDirectionControl.style.display = this.value === 'curved' ? 'block' : 'none';
+                    if (customLayer) {
+                        removeVertipad();
+                        addVertipad();
+                    }
+                });
+            });
+
+            // Add listener for curve direction changes
+            document.querySelectorAll('input[name="curveDirection"]').forEach(radio => {
+                radio.addEventListener('change', function () {
+                    if (customLayer) {
+                        removeVertipad();
+                        addVertipad();
+                    }
+                });
+            });
+        });
+        function createDimensionLine(start, end, label, scene) {
+            const shapeType = document.querySelector('input[name="shapeType"]:checked').value;
+            // Create line
+            const points = [];
+            points.push(new THREE.Vector3(start.x, start.y, start.z));
+            points.push(new THREE.Vector3(end.x, end.y, end.z));
+
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({ color: 0x0000ff });
+            const line = new THREE.Line(geometry, material);
+
+            scene.add(line);
+
+            // Create label
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 3024; // Increase canvas width to accommodate larger text
+            canvas.height = 456; // Increase canvas height to accommodate larger text
+
+            context.fillStyle = 'blue';
+            context.font = '180px Arial'; // Set the font size to 180px
+            context.fillText(label, 40, 180); // Adjust the coordinates to position the text
+
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMaterial);
+
+            // Position sprite at midpoint of line
+            sprite.position.set(
+                (start.x + end.x) / 2,
+                (start.y + end.y) / 2,
+                (start.z + end.z) / 2 + 0.5 // Offset slightly above line
+            );
+            sprite.scale.set(30, 5, 1);
+
+            scene.add(line);
+            scene.add(sprite);
+
+            if (shapeType === 'curved') {
+                const edgeLength = parseFloat(document.getElementById('edgeLengthSlider').value);
+                const parallelEdge = parseFloat(document.getElementById('parallelEdgeSlider').value);
+                const depth = parseFloat(document.getElementById('depthSlider').value);
+                const rotation = parseFloat(document.getElementById('rotationSlider').value) * (Math.PI / 180);
+                const color = document.getElementById('colorPicker').value;
+                const transparency = parseFloat(document.getElementById('transparencySlider').value) / 100;
+                const height = parseFloat(document.getElementById('heightSlider').value);
+                const baseHeight = parseFloat(document.getElementById('baseHeightSlider').value);
+                const radius = parseFloat(document.getElementById('radiusSlider').value);
+                const curveDirection = document.querySelector('input[name="curveDirection"]:checked').value;
+                const middleedge = document.getElementById('middleEdgeLengthSlider').value;
+                const directionMultiplier = curveDirection === 'left' ? 1 : -1;
+
+                // Calculate the center point of the radius circle
+                const safeRadius = Math.max(radius, depth / 2);
+                const arcRatio = depth / (2 * safeRadius);
+                const clampedArcRatio = Math.max(-1, Math.min(1, arcRatio));
+                const totalAngle = Math.asin(clampedArcRatio);
+
+                // Offset for placing dimension below geometry
+                const verticalOffset = -5; // Adjust this value to control how far below the geometry the dimension appears
+
+                // Center point of the radius circle
+                const centerPoint = new THREE.Vector3(directionMultiplier * safeRadius, depth / 2, baseHeight + verticalOffset);
+
+                // Point on the curve (we'll use the middle point)
+                const curvePoint = new THREE.Vector3(0, depth / 2, baseHeight + verticalOffset);
+
+                // Create radius line
+                const radiusPoints = [];
+                radiusPoints.push(centerPoint);
+                radiusPoints.push(curvePoint);
+
+                const radiusGeometry = new THREE.BufferGeometry().setFromPoints(radiusPoints);
+                const radiusMaterial = new THREE.LineBasicMaterial({ color: 0x0000ff });
+                const radiusLine = new THREE.Line(radiusGeometry, radiusMaterial);
+                scene.add(radiusLine);
+
+                // Create radius label with larger text
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = 3024;
+                canvas.height = 456;
+
+                context.fillStyle = 'blue';
+                context.font = '180px Arial';
+                context.fillText(`R: ${safeRadius.toFixed(1)}m`, 40, 180);
+
+                const texture = new THREE.CanvasTexture(canvas);
+                const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+                const sprite = new THREE.Sprite(spriteMaterial);
+
+                // Position sprite at midpoint of radius line
+                sprite.position.set(
+                    (centerPoint.x + curvePoint.x) / 2,
+                    (centerPoint.y + curvePoint.y) / 2,
+                    (centerPoint.z + curvePoint.z) / 2 + 0.5
+                );
+                sprite.scale.set(30, 5, 1);
+                scene.add(sprite);
+
+                // Create visualization arc below the geometry
+                const arcPoints = [];
+                const arcSegments = 16;
+                const startAngle = -totalAngle / 2;
+                const endAngle = totalAngle / 2;
+
+                for (let i = 0; i <= arcSegments; i++) {
+                    const t = i / arcSegments;
+                    const angle = startAngle + (endAngle - startAngle) * t;
+                    const x = directionMultiplier * (safeRadius * Math.cos(angle));
+                    const z = safeRadius * Math.sin(angle) + depth / 2;
+                    arcPoints.push(new THREE.Vector3(x, z, baseHeight + verticalOffset));
+                }
+
+                const arcGeometry = new THREE.BufferGeometry().setFromPoints(arcPoints);
+                const arcMaterial = new THREE.LineBasicMaterial({ color: 0x0000ff });
+                const arc = new THREE.Line(arcGeometry, arcMaterial);
+                scene.add(arc);
+            }
+
+            return { line, sprite };
+        }
+
+        function toggleDimensions() {
+            showDimensions = !showDimensions;
+            if (customLayer) {
+                removeVertipad();
+                addVertipad();
+            }
+        }
+
+        function updateDimensions() {
+            const edgeLength = document.getElementById('edgeLengthSlider').value;
+            const parallelEdge = document.getElementById('parallelEdgeSlider').value;
+            const depth = document.getElementById('depthSlider').value;
+            const rotation = document.getElementById('rotationSlider').value;
+            const transparency = document.getElementById('transparencySlider').value;
+            const height = document.getElementById('heightSlider').value;
+            const baseHeight = document.getElementById('baseHeightSlider').value;
+            const radius = document.getElementById('radiusSlider').value;
+            const startEdgeRotation = document.getElementById('startEdgeRotationSlider').value;
+            const endEdgeRotation = document.getElementById('endEdgeRotationSlider').value;
+            const middleedge = document.getElementById('middleEdgeLengthSlider').value;
+            const middleEdgeDistance=document.getElementById('middleEdgeDistanceSlider').value;
+            const transitionalHeight=document.getElementById('transitionalHeightSlider').value;
+            const transitionalRotation=document.getElementById('transitionalRotationSlider').value;
+
+            document.getElementById('edgeLengthValue').textContent = edgeLength;
+            document.getElementById('parallelEdgeValue').textContent = parallelEdge;
+            document.getElementById('depthValue').textContent = depth;
+            document.getElementById('rotationValue').textContent = rotation;
+            document.getElementById('transparencyValue').textContent = transparency;
+            document.getElementById('heightValue').textContent = height;
+            document.getElementById('baseHeightValue').textContent = baseHeight;
+            document.getElementById('radiusValue').textContent = radius;
+            document.getElementById('startEdgeRotationValue').textContent = startEdgeRotation;
+            document.getElementById('endEdgeRotationValue').textContent = endEdgeRotation;
+            document.getElementById('middleEdgeLengthValue').textContent = middleedge;
+            document.getElementById('middleEdgeDistanceValue').textContent=middleEdgeDistance;
+            document.getElementById('transitionalHeightValue').textContent=transitionalHeight;
+            document.getElementById('transitionalRotationValue').textContent=transitionalRotation;
+
+            if (customLayer && map.getLayer('custom-layer')) {
+                removeVertipad();
+                addVertipad();
+            }
+        }
+
+        function createVertipadModel() {
+            const scene = new THREE.Scene();
+            const shapeType = document.querySelector('input[name="shapeType"]:checked').value;
+            const curveDirection = document.querySelector('input[name="curveDirection"]:checked').value;
+            const directionMultiplier = curveDirection === 'left' ? 1 : -1;
+
+            const edgeLength = parseFloat(document.getElementById('edgeLengthSlider').value);
+            const parallelEdge = parseFloat(document.getElementById('parallelEdgeSlider').value);
+            const depth = parseFloat(document.getElementById('depthSlider').value);
+            const rotation = parseFloat(document.getElementById('rotationSlider').value) * (Math.PI / 180);
+            const color = document.getElementById('colorPicker').value;
+            const surfaceColor=document.getElementById('surface').value;
+            const transparency = parseFloat(document.getElementById('transparencySlider').value) / 100;
+            const height = parseFloat(document.getElementById('heightSlider').value);
+            const baseHeight = parseFloat(document.getElementById('baseHeightSlider').value);
+            const radius = parseFloat(document.getElementById('radiusSlider').value);
+            const middleEdge = parseFloat(document.getElementById('middleEdgeLengthSlider').value);
+            const transitionalHeight=parseFloat(document.getElementById('transitionalHeightSlider').value);
+            const transitionalRotation=parseFloat(document.getElementById('transitionalRotationSlider').value)*(Math.PI/180);
+            let geometry;
+
+            if (shapeType === 'straight') {
+                // Create straight trapezoid with middle edge
+                const vertices = new Float32Array([
+                    -edgeLength / 2, 0, baseHeight, // Start Left (0)
+                    edgeLength / 2, 0, baseHeight, // Start Right (1)
+                    -middleEdge / 2, depth / 2, (height + baseHeight) / 2, // Middle Left (2)
+                    middleEdge / 2, depth / 2, (height + baseHeight) / 2, // Middle Right (3)
+                    parallelEdge / 2, depth, height, // End Right (4)
+                    -parallelEdge / 2, depth, height, // End Left (5)
+// // Duplicate Start Left (6) with transitional height and rotation
+// -edgeLength / 2, 0, baseHeight + transitionalRotation, 
+//// Duplicate Middle Left (7) with transitional height and rotation
+//     -middleEdge / 2, (height + baseHeight) / 2 + transitionalRotation, depth / 2,  
+//     // Duplicate Start Right (8) with transitional height and rotation
+//     edgeLength / 2, 0, baseHeight + transitionalRotation, 
+//     // Duplicate Middle Right (9) with transitional height and rotation
+//     middleEdge / 2,  (height + baseHeight) / 2 + transitionalRotation, depth / 2, 
+               
+                    // Duplicates for transitional surfaces
+                    -edgeLength / 2, 0, baseHeight, // Duplicate Start Left (6)
+                    -middleEdge / 2, (height + baseHeight) / 2,depth / 2,  // Duplicate Middle Left (7)
+                    edgeLength / 2, 0, baseHeight, // Duplicate Start Right (8)
+                    middleEdge / 2,  (height + baseHeight) / 2,depth / 2, // Duplicate Middle Right (9)
+
+                   
+                ]); 
+
+                const indices = new Uint16Array([
+                    // Main trapezoid faces
+                    0, 1, 2,
+                    1, 3, 2,
+                    2, 3, 4,
+                    2, 4, 5,
+                    0, 7, 2,
+                    1, 9, 3
+
+                ]);
+
+                geometry = new THREE.BufferGeometry();
+                geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+                geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+                geometry.computeVertexNormals();
+                console.log('success');
+
+            } else {
+                // Create curved trapezoid with middle edge
+                const segments = 32; // Number of segments for the curve
+                const vertices = [];
+                const indices = [];
+
+                // Calculate control points for the curve
+                const startWidth = edgeLength;
+                const endWidth = parallelEdge;
+
+                for (let i = 0; i <= segments; i++) {
+                    const t = i / segments;
+                    const z = t * depth;
+
+                    try {
+                        // Ensure radius is not too small compared to depth
+                        const minRadius = depth / 2;
+                        const safeRadius = Math.max(radius, minRadius);
+
+                        // Calculate the arc parameters
+                        const arcRatio = depth / (2 * safeRadius);
+                        // Clamp arcRatio to valid range for asin (-1 to 1)
+                        const clampedArcRatio = Math.max(-1, Math.min(1, arcRatio));
+                        const totalAngle = Math.asin(clampedArcRatio);
+
+                        // Calculate current angle, varying from -totalAngle to +totalAngle
+                        const currentAngle = totalAngle * (2 * t - 1);
+
+                        // Calculate position along the circular arc
+                        const xOffset = directionMultiplier * safeRadius * (1 - Math.cos(currentAngle));
+                        const zPos = safeRadius * Math.sin(currentAngle) + depth / 2;
+
+                        // Interpolate width and height
+                        const currentWidth = startWidth + (endWidth - startWidth) * t;
+                        const currentHeight = baseHeight + (height - baseHeight) * t;
+
+                        // Get edge rotation angles
+                        const startEdgeRotation = parseFloat(document.getElementById('startEdgeRotationSlider').value) * (Math.PI / 180);
+                        const endEdgeRotation = parseFloat(document.getElementById('endEdgeRotationSlider').value) * (Math.PI / 180);
+
+                        // Calculate rotation interpolation based on position
+                        const edgeRotation = startEdgeRotation * (1 - t) + endEdgeRotation * t;
+
+                        // Calculate rotated positions
+                        const leftPoint = {
+                            x: -currentWidth / 2 * Math.cos(edgeRotation),
+                            z: -currentWidth / 2 * Math.sin(edgeRotation)
+                        };
+                        const rightPoint = {
+                            x: currentWidth / 2 * Math.cos(edgeRotation),
+                            z: currentWidth / 2 * Math.sin(edgeRotation)
+                        };
+
+                        // Add vertices with rotated positions
+                        vertices.push(
+                            leftPoint.x + xOffset, zPos + leftPoint.z, currentHeight,
+                            rightPoint.x + xOffset, zPos + rightPoint.z, currentHeight,
+                           
+                        );
+                    } catch (error) {
+                        console.error('Error in vertex calculation:', error);
+                        // Fallback to straight line if calculation fails
+                        const z = t * depth;
+                        vertices.push(
+                            -currentWidth / 2, z, currentHeight,
+                            currentWidth / 2, z, currentHeight,
+                            
+                        );
+                    }
+
+                    // Create faces (triangles) between segments
+                    if (i < segments) {
+                        const baseIndex = i * 4;
+                        indices.push(
+                            baseIndex, baseIndex + 1, baseIndex + 2,
+                            baseIndex + 1, baseIndex + 3, baseIndex + 2,
+                           
+                        );
+                    }
+                }
+
+                geometry = new THREE.BufferGeometry();
+                geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                geometry.setIndex(indices);
+            }
+
+            geometry.computeVertexNormals();
+
+            const material = new THREE.MeshPhongMaterial({
+                color: new THREE.Color(color),
+                opacity: transparency,
+                transparent: true,
+                depthWrite: true,
+                depthTest: true,
+                side: THREE.DoubleSide,
+                shininess: 0
+            });
+
+
+
+            const vertipad = new THREE.Mesh(geometry, material);
+            vertipad.rotation.z = rotation;
+            scene.add(vertipad);
+
+            // Add dimension lines if enabled
+            if (showDimensions) {
+                // Calculate actual height difference
+                const heightDiff = Math.abs(height - baseHeight);
+
+                // Create height dimension line
+                const heightStart = new THREE.Vector3(parallelEdge / 2 + 2, depth, baseHeight);
+                const heightEnd = new THREE.Vector3(parallelEdge / 2 + 2, depth, height);
+                createDimensionLine(heightStart, heightEnd, `Height: ${heightDiff.toFixed(1)}m`, scene);
+
+                // Create length X (depth) dimension line
+                const lengthXStart = new THREE.Vector3(-edgeLength / 2 - 1, 0, 0);
+                const lengthXEnd = new THREE.Vector3(-edgeLength / 2 - 1, depth, 0);
+                createDimensionLine(lengthXStart, lengthXEnd, `Length X: ${depth}m`, scene);
+
+                // Create length Y dimension line
+                const lengthYStart = new THREE.Vector3(-edgeLength / 2, 0, -1);
+                const lengthYEnd = new THREE.Vector3(edgeLength / 2, 0, -1);
+                createDimensionLine(lengthYStart, lengthYEnd, `Length Y: ${edgeLength}m`, scene);
+
+                // Calculate and display angle
+                const angleRad = Math.atan2(height - baseHeight, depth);
+                const angleDeg = (angleRad * 180 / Math.PI).toFixed(1);
+
+                // Create angle indicator
+                const angleStart = new THREE.Vector3(edgeLength / 2 + 1, 0, baseHeight);
+                const angleEnd = new THREE.Vector3(edgeLength / 2 + 1, depth / 4, baseHeight + (height - baseHeight) / 4);
+                createDimensionLine(angleStart, angleEnd, `θ: ${angleDeg}°`, scene);
+            }
+
+            const placeholderGeometry = new THREE.BoxGeometry(0.01, 0.01, 0.01);
+            const placeholderMaterial = new THREE.MeshBasicMaterial({
+                color: 0x808080,
+                opacity: 0,
+                transparent: true
+            });
+            const placeholder = new THREE.Mesh(placeholderGeometry, placeholderMaterial);
+            placeholder.position.z = 0.2;
+            scene.add(placeholder);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(0, 70, 100).normalize();
+            scene.add(directionalLight);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            return scene;
+        }
+
+        map.on('click', (e) => {
+            currentPosition = [e.lngLat.lng, e.lngLat.lat];
+            document.getElementById('coordinates').innerHTML =
+                `Selected Position:<br>Lat: ${e.lngLat.lat.toFixed(4)}, Lng: ${e.lngLat.lng.toFixed(4)}`;
+
+            if (customLayer) {
+                removeVertipad();
+                addVertipad();
+            }
+        });
+
+        function addVertipad() {
+            removeVertipad();
+
+            const modelAltitude = 0;
+            const modelRotate = [0, 0, 0];
+
+            const modelAsMercatorCoordinate = mapboxgl.MercatorCoordinate.fromLngLat(
+                currentPosition,
+                modelAltitude
+            );
+
+            const modelTransform = {
+                translateX: modelAsMercatorCoordinate.x,
+                translateY: modelAsMercatorCoordinate.y,
+                translateZ: modelAsMercatorCoordinate.z,
+                rotateX: modelRotate[0],
+                rotateY: modelRotate[1],
+                rotateZ: modelRotate[2],
+                scale: modelAsMercatorCoordinate.meterInMercatorCoordinateUnits()
+            };
+
+            customLayer = {
+                id: 'custom-layer',
+                type: 'custom',
+                renderingMode: '3d',
+                onAdd: function (map, gl) {
+                    this.camera = new THREE.Camera();
+                    this.scene = createVertipadModel();
+                    this.map = map;
+
+                    this.renderer = new THREE.WebGLRenderer({
+                        canvas: map.getCanvas(),
+                        context: gl,
+                        antialias: true,
+                        alpha: true,
+                        preserveDrawingBuffer: true
+                    });
+
+                    this.renderer.autoClear = false;
+                    // Add a zoom event listener to recompute the modelTransform
+                    this.map.on('zoom', () => {
+                        const updatedModelAsMercatorCoordinate = mapboxgl.MercatorCoordinate.fromLngLat(
+                            currentPosition,
+                            modelAltitude
+                        );
+
+                        this.modelTransform = {
+                            translateX: updatedModelAsMercatorCoordinate.x,
+                            translateY: updatedModelAsMercatorCoordinate.y,
+                            translateZ: updatedModelAsMercatorCoordinate.z,
+                            rotateX: modelRotate[0],
+                            rotateY: modelRotate[1],
+                            rotateZ: modelRotate[2],
+                            scale: updatedModelAsMercatorCoordinate.meterInMercatorCoordinateUnits()
+                        };
+                    });
+                },
+                render: function (gl, matrix) {
+                    const rotationX = new THREE.Matrix4().makeRotationAxis(
+                        new THREE.Vector3(1, 0, 0),
+                        modelTransform.rotateX
+                    );
+                    const rotationY = new THREE.Matrix4().makeRotationAxis(
+                        new THREE.Vector3(0, 1, 0),
+                        modelTransform.rotateY
+                    );
+                    const rotationZ = new THREE.Matrix4().makeRotationAxis(
+                        new THREE.Vector3(0, 0, 1),
+                        modelTransform.rotateZ
+                    );
+
+                    const m = new THREE.Matrix4().fromArray(matrix);
+                    const l = new THREE.Matrix4()
+                        .makeTranslation(
+                            modelTransform.translateX,
+                            modelTransform.translateY,
+                            modelTransform.translateZ
+                        )
+                        .scale(
+                            new THREE.Vector3(
+                                modelTransform.scale,
+                                -modelTransform.scale,
+                                modelTransform.scale
+                            )
+                        )
+                        .multiply(rotationX)
+                        .multiply(rotationY)
+                        .multiply(rotationZ);
+
+                    this.camera.projectionMatrix = m.multiply(l);
+                    this.renderer.state.reset();
+                    this.renderer.render(this.scene, this.camera);
+
+                    if (this.map.isMoving() || this.map.isRotating() || this.map.isZooming()) {
+                        this.map.triggerRepaint();
+                    }
+                }
+            };
+
+            if (!map.getLayer('custom-layer')) {
+                map.addLayer(customLayer);
+            }
+        }
+
+        function removeVertipad() {
+            if (map.getLayer('custom-layer')) {
+                map.removeLayer('custom-layer');
+            }
+            customLayer = null;
+        }
+    </script>
+
+</body>
+
+
+</html> 
